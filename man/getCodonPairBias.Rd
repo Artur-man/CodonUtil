@@ -4,12 +4,7 @@
 \alias{getCodonPairBias}
 \title{getCodonPairBias}
 \usage{
-getCodonPairBias(
-  pair_counts,
-  single_counts,
-  method = "RSCPU",
-  GENETIC_CODE_PAIR
-)
+getCodonPairBias(pair_counts, single_counts, method = "RSCPU")
 }
 \arguments{
 \item{pair_counts}{counts for each codon pair}
@@ -17,8 +12,6 @@ getCodonPairBias(
 \item{single_counts}{counts for each codon}
 
 \item{method}{method of codon pair bias calculation, e.g. RSCPU}
-
-\item{GENETIC_CODE_PAIR}{}
 }
 \description{
 Generate Codon pair bias measures for each codon pair and sequence
