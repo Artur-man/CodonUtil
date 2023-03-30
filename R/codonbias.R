@@ -9,23 +9,22 @@
 #' @param pair_counts counts for each codon pair
 #' @param single_counts counts for each codon
 #' @param method method of codon pair bias calculation, e.g. RSCPU
-#' @param GENETIC_CODE_PAIR
 #'
 #' @export
 #'
-#' @examples
-getCodonPairBias <- function(pair_counts, single_counts, method = "RSCPU", GENETIC_CODE_PAIR) {
+getCodonPairBias <- function(pair_counts, single_counts, method = "RSCPU") {
 
   # library
   require(Biostrings)
 
   # check if all codons are here
+  GENETIC_CODE_PAIR <- getPairGENETIC_CODE()
   if(!all(colnames(pair_counts) %in% names(GENETIC_CODE_PAIR)))
     stop("Please make sure that your count data includes all codons")
 
   # choose a method for codon bias normalization
   if(method == "RSCPU"){
-    normcounts <- getCodonBiasRSCPU(pair_counts, single_counts, GENETIC_CODE_PAIR = GENETIC_CODE_PAIR)
+    normcounts <- getCodonBiasRSCPU(pair_counts, single_counts)
   }
 
   # return normalized counts
@@ -33,7 +32,7 @@ getCodonPairBias <- function(pair_counts, single_counts, method = "RSCPU", GENET
 }
 
 # RSCU normalization
-getCodonBiasRSCPU <- function(pair_counts, single_counts, GENETIC_CODE_PAIR) {
+getCodonBiasRSCPU <- function(pair_counts, single_counts) {
 
   # get expected counts
   pair_counts_exp <- t(apply(single_counts, 1, function(x){
@@ -45,27 +44,6 @@ getCodonBiasRSCPU <- function(pair_counts, single_counts, GENETIC_CODE_PAIR) {
 
   # return
   return(norm_pair_counts)
-}
-
-#' getPairGENETIC_CODE
-#'
-#' get pairs of AA from Biostrings::GENETIC_CODE
-#'
-#' @export
-#'
-getPairGENETIC_CODE <- function(){
-
-  # library
-  require(Biostrings)
-
-  # get pairs
-  GENETIC_CODE_PAIR <- as.vector(outer(GENETIC_CODE, GENETIC_CODE, FUN=paste0))
-
-  # get names for pairs
-  names(GENETIC_CODE_PAIR) <-  as.vector(outer(names(GENETIC_CODE), names(GENETIC_CODE), FUN=paste0))
-
-  # return
-  return(GENETIC_CODE_PAIR)
 }
 
 ####
@@ -82,7 +60,6 @@ getPairGENETIC_CODE <- function(){
 #'
 #' @export
 #'
-#' @examples
 getCodonBias <- function(counts, method = "RSCU", sizeFactor = 100) {
 
   # library
