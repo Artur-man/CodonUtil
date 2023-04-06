@@ -65,7 +65,7 @@ getCDSfromGTF <- function (gtf, seqs, attrsep = "; ")
     fullseq = seqs[which(names(seqs) == chr)]
 
     # get cds reads from the start and end given in gtf file
-    these_seqs = subseq(rep(fullseq, times = nrow(dftmp)), start = dftmp$start, end = dftmp$end)
+    these_seqs <- subseq(rep(fullseq, times = nrow(dftmp)), start = dftmp$start, end = dftmp$end)
 
     # get transcript names
     transcripts = getAttributeField(dftmp$attributes, field = "transcript_id", attrsep = attrsep)
@@ -74,7 +74,7 @@ getCDSfromGTF <- function (gtf, seqs, attrsep = "; ")
       transcripts <- substr(x, 2, nchar(x) - 1)
     }
 
-    # aggregate by transcripts
+    # aggregate sequences and locations by transcripts
     unique_transcripts <- unique(transcripts)
     names(these_seqs) <- transcripts
     new_seqs <- sapply(unique_transcripts, function(trans){
@@ -83,27 +83,44 @@ getCDSfromGTF <- function (gtf, seqs, attrsep = "; ")
     })
     names(new_seqs) <- NULL
     new_seqs <- do.call(c, new_seqs)
+    locations <- sapply(unique_transcripts, function(trans){
+      dftmp_trans <- dftmp[transcripts == trans,]
+      dftmp_trans_seq <- mapply(function(x,y) return(x:y), dftmp_trans$start, dftmp_trans$end)
+      as.vector(unlist(dftmp_trans_seq))
+    })
 
     # reverse complement sequences, if negative strand
     transcripts_strand <- data.frame(transcripts = transcripts, strand = dftmp$strand)
     transcripts_strand <- transcripts_strand[!duplicated(transcripts_strand),]
-    revstrand = which(transcripts_strand$strand == "-")
-    new_seqs[revstrand] = reverseComplement(new_seqs[revstrand])
+    revstrand <- which(transcripts_strand$strand == "-")
+    new_seqs[revstrand] <- reverseComplement(new_seqs[revstrand])
+    locations[revstrand] <- lapply(locations[revstrand], rev)
+    locations <- lapply(locations, function(loc) {
+      data.frame(locations = loc, entry = rep(chr, length(loc)))
+    })
 
     # return sequences
     names(new_seqs) <- transcripts_strand$transcripts
-    new_seqs
+    return(list(strings = new_seqs, locations = locations))
   })
 
+  # get all strings
+  strings <- do.call(c, lapply(seqlist, function(x) x$strings))
+
+  # get and combine all locations with fasta entries
+  locations <- do.call(c, lapply(seqlist, function(x) x$locations))
+
   # return sequences
-  do.call(c, seqlist)
+  return(list(strings = strings, locations = locations))
 }
 
-#' scanSeqWindow
+#' scanCDSSeqWindow
 #'
 #' Scan a set of sequences using sliding windows and nucleotide pattern
 #'
 #' @param sequences a DNAStringSet object
+#' @param
+#' @param annotation the annotation file
 #' @param window_size the size/length of the sliding windows
 #' @param pattern the nucleotide pattern
 #'
@@ -112,7 +129,7 @@ getCDSfromGTF <- function (gtf, seqs, attrsep = "; ")
 #'
 #' @export
 #'
-scanSeqWindow <- function (sequences, window_size = 20, pattern)
+scanCDSSeqWindow <- function (sequences, locations, annotation, window_size = 20, pattern)
 {
   if(is.null(pattern) | is.null(sequences))
     stop("You have to provide both the sequences and the searched pattern")
@@ -125,13 +142,15 @@ scanSeqWindow <- function (sequences, window_size = 20, pattern)
 
   # search for the pattern and count
   seq_scan <- lapply(seq_along(1:length(sequences)), function(i){
-    cat("Sequence:", names(sequences)[i], "\n")
-    seq_matched <- matchPattern(pattern, sequences[[i]])
-    matched <- rep(0,length(sequences[[i]]))
+    cat("ID:", i, "Sequence:", names(sequences)[i], "\n")
+    seq <- sequences[[i]]
+    loc <- locations[[i]]
+    seq_matched <- matchPattern(pattern, seq)
+    matched <- rep(0,length(seq))
     matched[start(seq_matched)] <- 1
     count_pattern <- frollsum(matched, window_size, align = "center")
-    start_count_pattern <- 1:length(count_pattern)
-    data.frame(chr = names(sequences)[i], start = start_count_pattern, end = start_count_pattern, score = count_pattern/window_size)
+    start_count_pattern <- loc$locations
+    data.frame(chr = loc$entry, start = start_count_pattern, end = start_count_pattern, score = count_pattern/window_size)
   })
 
   # return
