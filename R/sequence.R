@@ -141,8 +141,15 @@ scanCDSSeqWindow <- function (sequences, locations, annotation, window_size = 20
     stop("The pattern cannot be longer than the window size =", window_size)
 
   # search for the pattern and count
+  cat("Scanning sequences \n")
+  break_seq <- floor(length(sequences)/50)
   seq_scan <- lapply(seq_along(1:length(sequences)), function(i){
-    cat("ID:", i, "Sequence:", names(sequences)[i], "\n")
+    # cat("ID:", i, "Sequence:", names(sequences)[i], "\n")
+    if(!(i %% break_seq)){
+      prog <- floor(i/break_seq)
+      cat('\r', "Working  [", strrep("#",prog),
+          strrep(" ", 50-prog), "] ", 2*prog, "%", sep="")
+    }
     seq <- sequences[[i]]
     loc <- locations[[i]]
     seq_matched <- matchPattern(pattern, seq)
@@ -150,9 +157,33 @@ scanCDSSeqWindow <- function (sequences, locations, annotation, window_size = 20
     matched[start(seq_matched)] <- 1
     count_pattern <- frollsum(matched, window_size, align = "center")
     start_count_pattern <- loc$locations
-    data.frame(chr = loc$entry, start = start_count_pattern, end = start_count_pattern, score = count_pattern/window_size)
+    window_size_adj <- floor(window_size/nchar(pattern))
+    data.frame(chr = loc$entry, start = start_count_pattern, end = start_count_pattern, score = count_pattern/window_size_adj)
   })
+  cat(" \n\r")
+
+  # combine
+  cat("Combine Scans \n")
+  seq_scan <- do.call(rbind,seq_scan)
+  seq_scan <- na.omit(seq_scan)
+
+  # sort for each chromosome
+  cat("Sorting fasta entries \n")
+  seq_scan_sorted <- NULL
+  all_chr <- unique(seq_scan$chr)
+  cat("Total number of fasta entries: ", length(all_chr), "\n")
+  break_seq <- floor(length(all_chr)/10)
+  for(i in 1:length(all_chr)){
+    if(!(i %% break_seq)){
+      prog <- floor(i/break_seq)
+      cat('\r', "Working  [", strrep("#",prog),
+          strrep(" ", 10-prog), "] ", 2*prog, "%", sep="")
+    }
+    temp <- seq_scan[seq_scan$chr == all_chr[i],]
+    seq_scan_sorted <- rbind(seq_scan_sorted,
+                             temp[order(seq_scan$start, decreasing = FALSE),])
+  }
 
   # return
-  do.call(rbind,seq_scan)
+  seq_scan_sorted
 }
