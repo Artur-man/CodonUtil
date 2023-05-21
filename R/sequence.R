@@ -93,6 +93,7 @@ getCDSfromGTF <- function (gtf, seqs, attrsep = "; ")
     transcripts_strand <- data.frame(transcripts = transcripts, strand = dftmp$strand)
     transcripts_strand <- transcripts_strand[!duplicated(transcripts_strand),]
     revstrand <- which(transcripts_strand$strand == "-")
+
     new_seqs[revstrand] <- reverseComplement(new_seqs[revstrand])
     locations[revstrand] <- lapply(locations[revstrand], rev)
     locations <- lapply(locations, function(loc) {
@@ -119,7 +120,7 @@ getCDSfromGTF <- function (gtf, seqs, attrsep = "; ")
 #' Scan a set of sequences using sliding windows and nucleotide pattern
 #'
 #' @param sequences a DNAStringSet object
-#' @param
+#' @param locations locations provided for each sequence
 #' @param annotation the annotation file
 #' @param window_size the size/length of the sliding windows
 #' @param pattern the nucleotide pattern
@@ -129,7 +130,7 @@ getCDSfromGTF <- function (gtf, seqs, attrsep = "; ")
 #'
 #' @export
 #'
-scanCDSSeqWindow <- function (sequences, locations, annotation, window_size = 20, pattern)
+scanCDSSeqWindow <- function (sequences, locations, annotation, window_size = 20, pattern, count_codon = TRUE)
 {
   if(is.null(pattern) | is.null(sequences))
     stop("You have to provide both the sequences and the searched pattern")
@@ -144,17 +145,18 @@ scanCDSSeqWindow <- function (sequences, locations, annotation, window_size = 20
   cat("Scanning sequences \n")
   break_seq <- floor(length(sequences)/50)
   seq_scan <- lapply(seq_along(1:length(sequences)), function(i){
-    # cat("ID:", i, "Sequence:", names(sequences)[i], "\n")
     if(!(i %% break_seq)){
       prog <- floor(i/break_seq)
       cat('\r', "Working  [", strrep("#",prog),
           strrep(" ", 50-prog), "] ", 2*prog, "%", sep="")
     }
-    seq <- sequences[[i]]
+    curseq <- sequences[[i]]
     loc <- locations[[i]]
-    seq_matched <- matchPattern(pattern, seq)
-    matched <- rep(0,length(seq))
-    matched[start(seq_matched)] <- 1
+    seq_matched <- matchPattern(pattern, curseq)
+    matched <- rep(0,nchar(curseq))
+    seq_matched <- start(seq_matched)
+    if(count_codon) seq_matched <- seq_matched[seq_matched %in% seq(1,nchar(curseq),3)]
+    matched[seq_matched] <- 1
     count_pattern <- frollsum(matched, window_size, align = "center")
     start_count_pattern <- loc$locations
     window_size_adj <- floor(window_size/nchar(pattern))
@@ -162,28 +164,21 @@ scanCDSSeqWindow <- function (sequences, locations, annotation, window_size = 20
   })
   cat(" \n\r")
 
-  # combine
+  # combine and return
   cat("Combine Scans \n")
   seq_scan <- do.call(rbind,seq_scan)
   seq_scan <- na.omit(seq_scan)
 
-  # sort for each chromosome
   cat("Sorting fasta entries \n")
   seq_scan_sorted <- NULL
   all_chr <- unique(seq_scan$chr)
   cat("Total number of fasta entries: ", length(all_chr), "\n")
-  break_seq <- floor(length(all_chr)/10)
   for(i in 1:length(all_chr)){
-    if(!(i %% break_seq)){
-      prog <- floor(i/break_seq)
-      cat('\r', "Working  [", strrep("#",prog),
-          strrep(" ", 10-prog), "] ", 2*prog, "%", sep="")
-    }
+    cat("Sorting: ", all_chr[i], "\n")
     temp <- seq_scan[seq_scan$chr == all_chr[i],]
     seq_scan_sorted <- rbind(seq_scan_sorted,
-                             temp[order(seq_scan$start, decreasing = FALSE),])
+                             temp[order(temp$start, decreasing = FALSE),])
   }
 
-  # return
   seq_scan_sorted
 }
