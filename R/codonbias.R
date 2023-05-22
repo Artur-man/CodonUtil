@@ -34,13 +34,14 @@ getCodonPairBias <- function(pair_counts, single_counts, method = "RSCPU") {
 # RSCU normalization
 getCodonBiasRSCPU <- function(pair_counts, single_counts) {
 
-  # get expected counts
-  pair_counts_exp <- t(apply(single_counts, 1, function(x){
+  # get expected percentages/frequencies
+  single_counts_freq <- single_counts/rowSums(single_counts)
+  pair_counts_exp <- t(apply(single_counts_freq, 1, function(x){
     as.vector(crossprod(as.matrix(x)))
   }))
 
-  # get results
-  norm_pair_counts <- pair_counts/pair_counts_exp
+  # divide observed and expected percentages/frequencies
+  norm_pair_counts <- log((pair_counts/rowSums(pair_counts))/pair_counts_exp)
 
   # return
   return(norm_pair_counts)
