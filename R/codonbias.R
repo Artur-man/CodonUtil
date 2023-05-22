@@ -36,7 +36,7 @@ getCodonBiasRSCPU <- function(pair_counts, single_counts) {
 
   # get expected counts
   pair_counts_exp <- t(apply(single_counts, 1, function(x){
-    as.vector(crossprod(as.matrix(stringscodon[1,])))
+    as.vector(crossprod(as.matrix(x)))
   }))
 
   # get results
